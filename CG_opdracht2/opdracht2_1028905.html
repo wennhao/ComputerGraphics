@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opdracht 2</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+        }
+
+        #instructions {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <label for="shapeSelect">Select Shape:</label>
+    <select id="shapeSelect">
+        <option value="rectangle">Rectangle</option>
+        <option value="triangle">Triangle</option>
+        <option value="line">Line</option>
+        <option value="circle">Circle</option>
+    </select>
+
+
+    <input type="checkbox" id="rotateScaleMode" /> <label for="rotateScaleMode">Rotate/Scale Mode</label>
+
+    <canvas id="myCanvas" width="500" height="500"></canvas>
+
+    <div id="instructions">
+        <h1>Instructions</h1>
+        <p>up-arrow: move up, down-arrow: move down</p>
+        <p>left-arrow: move left, right-arrow: move right</p>
+        <p>when Rotate/Scale Mode is [Checked]</p>
+        <p>up-arrow: scale up, down-arrow: scale down</p>
+        <p>left-arrow: rotate counter-clockwise,  right-arrow: rotate clockwise</p>
+        <p>Press R key for Red color, B key for Blue, G key for Green</p>
+        <p>Press Y key for Yellow color, O key for Orange, P key for Purple</p>
+    </div>
+
+    <script>
+        var canvas = document.getElementById("myCanvas");
+        var context = canvas.getContext("2d");
+
+        var selectedShape = "rectangle";
+        var selectedColor = "red";
+        var positionX = 50;
+        var positionY = 50;
+        var lineLength = 100;
+        var rotationAngle = 0;
+        var scale = 1;
+        var rotateScaleMode = false;
+
+        // Added color change using keyboard events
+        var currentColor = "blue";
+        document.addEventListener("keydown", function(e) {
+            // Change color based on keyboard input
+            if (e.code === "KeyR") { currentColor = "red"; }
+            if (e.code === "KeyG") { currentColor = "green"; }
+            if (e.code === "KeyB") { currentColor = "blue"; }
+            if (e.code === "KeyY") { currentColor = "yellow"; }
+            if (e.code === "KeyO") { currentColor = "orange"; }
+            if (e.code === "KeyP") { currentColor = "purple"; }
+            draw();
+        });
+
+        function draw() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            switch (selectedShape) {
+                case "line":
+                    drawLine();
+                    break;
+                case "triangle":
+                    drawTriangle();
+                    break;
+                case "rectangle":
+                    drawRectangle();
+                    break;
+                case "circle":
+                    drawCircle();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        function drawLine() {
+            // Draw a line and apply rotation and scaling
+            context.save();
+            context.translate(positionX, positionY);
+            context.rotate(rotationAngle);
+            context.scale(scale, scale);
+            context.beginPath();
+            context.moveTo(0, 0);
+            context.lineTo(lineLength, 0);
+            context.lineWidth = 2;
+            context.strokeStyle = currentColor;
+            context.stroke();
+            context.restore();
+        }
+
+        function drawTriangle() {
+            // Draw a triangle and apply rotation and scaling
+            context.save();
+            context.translate(positionX, positionY);
+            context.rotate(rotationAngle);
+            context.scale(scale, scale);
+            context.beginPath();
+            context.moveTo(-30, 0);
+            context.lineTo(0, 50);
+            context.lineTo(30, 0);
+            context.closePath();
+            context.fillStyle = currentColor;
+            context.fill();
+            context.restore();
+        }
+
+        function drawRectangle() {
+            // Draw a rectangle and apply rotation and scaling
+            context.save();
+            context.translate(positionX, positionY);
+            context.rotate(rotationAngle);
+            context.scale(scale, scale);
+            context.beginPath();
+            context.rect(-50, -25, 100, 50);
+            context.lineWidth = 2;
+            context.strokeStyle = currentColor;
+            context.stroke();
+            context.fillStyle = currentColor;
+            context.fill();
+            context.restore();
+        }
+
+        function drawCircle() {
+            // Draw a circle and apply rotation and scaling
+            context.save();
+            context.translate(positionX + 50, positionY + 25);
+            context.rotate(rotationAngle);
+            context.scale(scale, scale);
+            context.beginPath();
+            context.arc(0, 0, 30, 0, 2 * Math.PI);
+            context.lineWidth = 2;
+            context.strokeStyle = currentColor;
+            context.stroke();
+            context.fillStyle = currentColor;
+            context.fill();
+            context.restore();
+        }
+
+        function updatePosition(e) {
+            if (rotateScaleMode) {
+                // Handle rotation and scaling in Rotate/Scale Mode
+                switch (e.key) {
+                    case "ArrowLeft":
+                        rotationAngle -= Math.PI / 18; // Rotate counter-clockwise
+                        break;
+                    case "ArrowRight":
+                        rotationAngle += Math.PI / 18; // Rotate clockwise
+                        break;
+                    case "ArrowUp":
+                        scale *= 1.1; // Increase scale by 1.1
+                        break;
+                    case "ArrowDown":
+                        scale /= 1.1; // Decrease scale by 1.1
+                        break;
+                    default:
+                        break;
+                }
+            } else {
+                // Handle movement in normal mode
+                switch (e.key) {
+                    case "ArrowUp": //go up
+                        positionY -= 10;
+                        break;
+                    case "ArrowDown": //go down
+                        positionY += 10;
+                        break;
+                    case "ArrowLeft": //go left
+                        positionX -= 10;
+                        break;
+                    case "ArrowRight": //go right
+                        positionX += 10;
+                        break;
+                    default: //default do nothing
+                        break;
+                }
+            }
+
+            draw();
+        }
+
+        function toggleRotateScaleMode() {
+            // Toggle Rotate/Scale Mode
+            rotateScaleMode = document.getElementById("rotateScaleMode").checked;
+            draw();
+        }
+
+        // Event listeners
+        document.getElementById("shapeSelect").addEventListener("change", function (e) {
+            selectedShape = e.target.value;
+            draw();
+        });
+
+        document.getElementById("rotateScaleMode").addEventListener("change", toggleRotateScaleMode);
+
+        document.addEventListener("keydown", updatePosition);
+
+        // Initial drawing
+        draw();
+    </script>
+</body>
+</html>

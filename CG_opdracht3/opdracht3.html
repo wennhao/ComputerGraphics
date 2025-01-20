@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opdracht 3</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        #scale {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            z-index: 10;
+        }
+    </style> 
+    <script src="https://unpkg.com/mathjs/lib/browser/math.js">// add math.js library from powerpoint</script> 
+</head>
+<body>
+    <div id="instructions">Toggle color by pressing F / Scale by 10 by pressing UP or DOWN arrows </div>
+    <div id="scale">Current size: x</div>
+    <canvas id="myCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        const instructions = document.getElementById('instructions');
+        const scalePrint = document.getElementById('scale');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const vertices = [
+            [-1, -1, -1], 
+            [1, -1, -1], 
+            [1, 1, -1], 
+            [-1, 1, -1],
+            [-1, -1, 1], 
+            [1, -1, 1], 
+            [1, 1, 1], 
+            [-1, 1, 1]
+        ];
+
+        const edges = [
+            [0, 1], [1, 2], [2, 3], [3, 0],
+            [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7]
+        ];
+
+        let angleX = 0;
+        let angleY = 0;
+        let isBlackBackground = true;
+        let scale = 200; // initial scale size
+
+        function toggleColors() {
+            isBlackBackground = !isBlackBackground;
+            
+            if (isBlackBackground) {
+                document.body.style.backgroundColor = "black"; //make the background black and the texts white
+                instructions.style.color = "white";
+                scalePrint.style.color = "white";
+            } else {
+                document.body.style.backgroundColor = "white"; //make the background white and the texts black
+                instructions.style.color = "black";
+                scalePrint.style.color = "black";
+            }
+        }
+
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'f' || event.key === 'F') { // when F is pressed
+                toggleColors();
+            } else if (event.key === 'ArrowUp') { // when UP arrow is pressed
+                scale = Math.min(300, scale + 10); // add scale up, max 300
+                scalePrint.textContent = `Current size: ${scale}`; // update the scale display
+            } else if (event.key === 'ArrowDown') { // when DOWN arrow is pressed
+                scale = Math.max(0, scale - 10); // add scale down, min 50
+                scalePrint.textContent = `Current size: ${scale}`; // update the scale display
+            }
+        });
+
+        scalePrint.textContent = `Current size: ${scale}`; // update the scale display
+
+        // creates the transformation matrix combining translation, rotation and scaling
+        function createTransformMatrix() {
+            const translation = [canvas.width / 2, canvas.height / 2, 0]; // center the cube
+
+            // calculate the sin and cos of the angles
+            const cosX = Math.cos(angleX);
+            const sinX = Math.sin(angleX);
+            const cosY = Math.cos(angleY);
+            const sinY = Math.sin(angleY);
+
+            // rotation matrices for x-axis and y-axis
+            const rotationX = [
+                [1, 0, 0, 0],
+                [0, cosX, -sinX, 0],
+                [0, sinX, cosX, 0],
+                [0, 0, 0, 1]
+            ];
+
+            const rotationY = [
+                [cosY, 0, sinY, 0],
+                [0, 1, 0, 0],
+                [-sinY, 0, cosY, 0],
+                [0, 0, 0, 1]
+            ];
+
+            // projection matrix for perspective
+            const projection = [
+                [1, 0, 0, 0],
+                [0, 1, 0, 0],
+                [0, 0, 1, -1 / 2],
+                [0, 0, 0, 1]
+            ];
+
+            // scaling matrix to change the size of the cube
+            const scaling = [
+                [scale, 0, 0, 0],
+                [0, scale, 0, 0],
+                [0, 0, scale, 0],
+                [0, 0,   0,   1]
+            ];
+
+            // translation matrix to move the cube
+            const translationMatrix = [
+                [1, 0, 0, translation[0]],
+                [0, 1, 0, translation[1]],
+                [0, 0, 1, translation[2]],
+                [0, 0, 0, 1]
+            ];
+
+            // combine all the matrices: projection -> translation -> scaling -> rotationY -> rotationX
+            return math.multiply(
+                projection,
+                math.multiply(
+                    translationMatrix,
+                    math.multiply(
+                        scaling,
+                        math.multiply(rotationY, rotationX)
+                    )
+                )
+            );
+        }
+        
+        // transform a point using the transformation matrix
+        function transformPoint(matrix, point) {
+            const [x, y, z] = point; // get the x, y, z coordinates of the point
+            const result = math.multiply(matrix, [x, y, z, 1]); // apply the transformation matrix
+            const w = result[3] || 1; // make sure w is notzero
+            return [result[0] / w, result[1] / w];  // return the transformed point
+        }
+
+        // draw the cube on the canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // clear the canvas
+
+            const transformMatrix = createTransformMatrix(); // get the transformation matrix
+
+            const transformedVertices = vertices.map(vertex => transformPoint(transformMatrix, vertex)); // apply the transformation matrix to all the vertices
+
+            ctx.beginPath(); // start drawing
+            edges.forEach(([start, end]) => {
+                // get the transformed coordinates of the start and end points of the edge
+                const [x1, y1] = transformedVertices[start];
+                const [x2, y2] = transformedVertices[end];
+
+                // then draw a line between the transformed points
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+            });
+            // set the color of the cubwe based on the background, default is blackbackground
+            if (isBlackBackground) {
+                ctx.strokeStyle = "white";
+            } else {
+                ctx.strokeStyle = "black";
+            }
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function animate() {
+            angleX += 0.005; // change the speed of the rotation
+            angleY += 0.005; // change the speed of the rotation
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

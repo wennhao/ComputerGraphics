@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>WebGL Rotating Cube</title>
+</head>
+<body>
+    <canvas id="myCanvas" width="640" height="480"></canvas>
+    <script type="text/javascript">
+        const ROTATION_SPEED = 0.5; // radians per second
+        const FILE_NAME = "objects/beveledcube.obj";
+        const TEXTURES = ["default.png", "cute.png", "default2.png", "angry.png"];
+        var TEXTURE_PATH = "./textures/" + TEXTURES[0];
+
+        function parseOBJ(text) {
+            let pos = [];
+            let texCoord = [];
+            let normal = [];
+            let vertices = [];
+            
+            // Split into separate lines
+            const lines = text.split("\n");
+            
+            // Parse line by line
+            lines.forEach((line, i) => {
+                // Check for empty lines and comments
+                if (line === "" || line.startsWith("#")) {
+                    return;
+                }
+
+                // Split into separate parts
+                const parts = line.trim().split(/\s+/);
+
+                // Check for keywords
+                switch (parts[0]) {
+
+                    // Object
+                    case "o":
+                        console.log("Found object: " + parts[1] + " at line " + (i + 1));
+                        break;
+
+                    // Position
+                    case "v":
+                        pos.push(parts.slice(1).map(parseFloat));
+                        break;
+                    
+                    // Normal
+                    case "vn":
+                        normal.push(parts.slice(1).map(parseFloat));
+                        break;
+
+                    // Texture coordinate
+                    case "vt":
+                        texCoord.push(parts.slice(1).map(parseFloat));
+                        break;
+                    
+                    // Smooth; not used
+                    case "s": 
+                        break;
+
+                    // Face; format: pos/texCoord/normal
+                    case "f":
+                        // Convert indices to integers
+                        let indexList = parts.slice(1).map((v) => v.split("/").map((l) => parseInt(l)));
+
+                        // Get position and normal corresponding to index
+                        // Index is 1-based, so subtract 1
+                        let vertList = indexList.map((l) => pos[l[0] - 1].concat(normal[l[2] - 1]));
+                        // let vertList = indexList.map((l) => [
+                        //     pos[l[0] - 1][0], pos[l[0] - 1][1], pos[l[0] - 1][2],  // Position
+                        //     normal[l[2] - 1][0], normal[l[2] - 1][1], normal[l[2] - 1][2],  // Normal
+                        //     texCoord[l[1] - 1][0], texCoord[l[1] - 1][1]  // Texture coordinates
+                        // ]);
+
+                        // Faces may be polygons with more than 3 vertices, so convert to series of triangles
+                        // Only works for concave shapes
+                        for (let j = 1; j < vertList.length - 1; j++) {
+                            vertices.push(...vertList[0]); // Common first vertex for all triangles
+                            vertices.push(...vertList[j]); // Second vertex
+                            vertices.push(...vertList[j + 1]); // Third vertex
+                        }
+                        break;
+                    default:
+                        console.log("Unknown keyword: " + parts[0] + " at line " + (i + 1));
+                }       
+            });
+            return vertices;
+        }
+        
+        function drawCube(angle) {
+            // Clear canvas
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            // Set rotation angle
+            gl.uniform1f(rotationAngleLocation, angle);
+
+            // Tell opengl to draw the vertices in the arrayBuffer as a series of triangles
+            gl.drawArrays(gl.TRIANGLES, 0, data.length / 6);
+        }
+
+        function draw() {
+            let angle = ROTATION_SPEED * 0.001 * (Date.now() - startTime);
+            drawCube(angle);
+        }
+
+        // Get WebGL 2.0 context
+        var gl = document.getElementById("myCanvas").getContext("webgl2");
+
+        // Compile vertex shader
+        let vs = gl.createShader(gl.VERTEX_SHADER);
+        let vsSource =
+          `#version 300 es
+            in vec3 aPos;
+            in vec3 aNormal;
+            in vec2 aTexCoord;
+
+            out vec3 normal;
+            out vec3 fragPos;
+            out vec2 texCoord;
+
+            uniform mat4 projection;
+            uniform mat4 translation;
+            uniform mat4 fixedRotation;
+            uniform float rotationAngle;
+
+            void main() {
+                float s = sin(rotationAngle);
+                float c = cos(rotationAngle);
+                mat4 rotation = mat4(c, 0, -s, 0,
+                                     0, 1,  0, 0,
+                                     s, 0,  c, 0,
+                                     0, 0,  0, 1); // Rotation matrix in column-major order
+
+                gl_Position = projection * translation * fixedRotation * rotation * vec4(aPos, 1.0);
+                normal = mat3(fixedRotation * rotation) * aNormal; // We don"t want translation or projection for the normal;
+                fragPos = vec3(translation * fixedRotation * rotation * vec4(aPos, 1.0)); // Position in 3D space before projection
+
+                texCoord = aTexCoord;
+            }`;
+        gl.shaderSource(vs, vsSource);
+        gl.compileShader(vs);
+        let status = gl.getShaderParameter(vs, gl.COMPILE_STATUS);
+        if (!status) {
+            let log = gl.getShaderInfoLog(vs);
+            throw new Error(log);
+        }
+
+        // Compile fragment shader
+        let fs = gl.createShader(gl.FRAGMENT_SHADER);
+        let fsSource = 
+           `#version 300 es
+            precision mediump float;
+
+            in vec3 normal;
+            in vec3 fragPos;
+            in vec2 texCoord;
+
+            uniform sampler2D u_texture;
+            uniform vec4 u_color;
+            uniform bool u_useTexture;
+
+            out vec4 outColor;
+
+            void main() {
+                // Check if the fragment is on the front face (assuming the front face is along the positive z-axis)
+                if (u_useTexture && normal.z > 0.0) {
+                    outColor = texture(u_texture, texCoord);
+                } else {
+                    outColor = u_color;
+                }
+            }`
+        gl.shaderSource(fs, fsSource);
+        gl.compileShader(fs);
+        status = gl.getShaderParameter(fs, gl.COMPILE_STATUS);
+        if (!status) {
+            let log = gl.getShaderInfoLog(fs);
+            throw new Error(log);
+        }
+
+        // Combine the two shaders into a program
+        let program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.useProgram(program);
+
+        // LIGHT--------------------------------------------------------------------------------------------------------
+        // Get the location of the lightPos uniform variable in the fragment shader
+        let lightPosLocation = gl.getUniformLocation(program, "lightPos");
+
+        // Variable to store light source position
+        let lightPos = { x: 0.1, y: 0.2, z: 0.3 };
+        gl.uniform3f(lightPosLocation, lightPos.x, lightPos.y, lightPos.z);
+        // /LIGHT-------------------------------------------------------------------------------------------------------
+
+        // BASE COLOR---------------------------------------------------------------------------------------------------
+        // Get the location of the lightPos uniform variable in the fragment shader
+        let baseColor = gl.getUniformLocation(program, "baseColor");
+
+        // Variable to store light source position
+        let colorValue = { r: 1.0, g: 0.2, b: 1.0, a: 1.0 }; //1.0f, 0.2f, 1.0f, 1.0f
+        gl.uniform4f(baseColor, colorValue.r, colorValue.g, colorValue.b, colorValue.a);
+        // /BASE COLOR--------------------------------------------------------------------------------------------------
+
+
+        // Retrieve 3D object file
+        let text;
+        const req = new XMLHttpRequest();
+        req.onload = function() {text = this.responseText};
+        req.open("GET", FILE_NAME, false); // false means synchronous request (wait for completion)
+        req.send();
+
+        // Convert object file to vertex data
+        let data = parseOBJ(text);
+    
+        // Convert to correct type
+        let vertices = new Float32Array(data);
+
+        // Create an arrayBuffer and fill it with data
+        let arrayBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, arrayBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        // Positions using 3 floats per vertex, stride of 24 bytes (6 32-bit floats)
+        let posLocation = gl.getAttribLocation(program, "aPos");
+        gl.vertexAttribPointer(posLocation, 3, gl.FLOAT, false, 24, 0);
+        gl.enableVertexAttribArray(posLocation);
+
+        // Normals using 3 floats per vertex, stride of 24 bytes (6 32-bit floats), offset of 12 bytes
+        let normalLocation = gl.getAttribLocation(program, "aNormal");
+        gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 24, 12);
+        gl.enableVertexAttribArray(normalLocation);
+
+        // Texture coordinates using 2 floats (u, v) per vertex, stride of 24 bytes, offset of 24 bytes
+        let texCoordLocation = gl.getAttribLocation(program, "aTexCoord");
+        gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, gl.FALSE, 32, 24);
+        gl.enableVertexAttribArray(texCoordLocation);
+
+
+        // Set the background color
+        gl.clearColor(0.1, 0.1, 0.1, 1); // r, g, b, alpha
+
+        // Perspective projection matrix
+        let projectionLocation = gl.getUniformLocation(program, "projection");
+        let projection = new Float32Array([1, 0, 0, 0,
+                                           0, 1, 0, 0,
+                                           0, 0, -1, -1,  // z coordinates are transformed to 1 + 1/z for depth buffer
+                                           0, 0, -1, 0]); // In column-major order
+        gl.uniformMatrix4fv(projectionLocation, false, projection); // Transpose field MUST be FALSE
+
+        // Translation matrix; move everything 3 units to the back
+        let translationLocation = gl.getUniformLocation(program, "translation");
+        let translation = new Float32Array([1, 0, 0, 0,
+                                            0, 1, 0, 0,
+                                            0, 0, 1, 0,
+                                            0, 0, -3, 1]); // In column-major order
+        gl.uniformMatrix4fv(translationLocation, false, translation); // Transpose field MUST be FALSE
+
+        // Fixed rotation matrix; rotate 30° around x-axis
+        let fixedRotationLocation = gl.getUniformLocation(program, "fixedRotation");
+        let c = Math.cos(Math.PI / 6);
+        let s = Math.sin(Math.PI / 6);
+        let fixedRotation = new Float32Array([1,  0, 0, 0,
+                                              0,  c, s, 0,
+                                              0, -s, c, 0,
+                                              0,  0, 0, 1]); // In column-major order
+        gl.uniformMatrix4fv(fixedRotationLocation, false, fixedRotation); // Transpose field MUST be FALSE
+
+        // Get location of rotation angle uniform
+        var rotationAngleLocation = gl.getUniformLocation(program, "rotationAngle");
+
+        // Set a square viewport
+        gl.viewport((gl.canvas.width - gl.canvas.height) / 2, 0, gl.canvas.height, gl.canvas.height);
+
+        // Enable z-buffer test
+        gl.enable(gl.DEPTH_TEST);
+
+        //creaty texture
+        var texture = gl.createTexture();
+
+        // Bind the texture so the following methods effect this texture
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        // Fill the texture buffer with a temporary texture of 1 texel (3 Uints)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3), 0);
+
+        // Create an image
+        var image = new Image();
+        image.crossOrigin = "";
+        image.src = "./textures/angry.png"; //
+        
+        // Once the image has loaded, use it to fill the texture buffer
+        image.addEventListener("load", function() {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        });
+
+        // Specify how the texture should be scaled
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        // Start animation
+        var startTime = Date.now();
+        setInterval(draw, 50); // 20 frames per second
+
+        
+
+        // Update the file name and reload object data
+        function changeObject() {
+            FILE_NAME = "./obj/" + OBJECTS[indexObject] + ".obj";
+
+            const req = new XMLHttpRequest();
+            req.onload = function() {
+                text = this.responseText;
+            };
+            req.open("GET", FILE_NAME, false); // false means synchronous request (wait for completion)
+            req.send();
+            // Convert object file to vertex data
+            data = parseOBJ(text);
+
+            // Convert to correct type
+            vertices = new Float32Array(data);
+
+            // Update the buffer data with the new vertices
+            gl.bindBuffer(gl.ARRAY_BUFFER, arrayBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        }
+
+        // Function to handle arrow key events
+        function handleKeyPress(event) {
+            const step = 0.5; // Adjust this value as needed for light movement speed
+            switch (event.key) {
+                case "ArrowUp":
+                    lightPos.y += step;
+                    break;
+                case "ArrowDown":
+                    lightPos.y -= step;
+                    break;
+                case "ArrowLeft":
+                    lightPos.x -= step;
+                    break;
+                case "ArrowRight":
+                    lightPos.x += step;
+                    break;
+                case "r":
+                    colorValue.r = Math.random();
+                    break;
+                case "g":
+                    colorValue.g = Math.random();
+                    break;
+                case "b":
+                    colorValue.b = Math.random();
+                    break;
+                case "a":
+                    colorValue.a = Math.random();
+                    break;
+                default:
+                    break;
+            }
+
+            // Update light position uniform in the shader
+            gl.uniform3f(lightPosLocation, lightPos.x, lightPos.y, lightPos.z);
+            gl.uniform4f(baseColor, colorValue.r, colorValue.g, colorValue.b, colorValue.a);
+        }
+
+        // Event listener for keydown events
+        window.addEventListener("keydown", handleKeyPress);
+    </script>
+    </script>
+</body>
+</html>
