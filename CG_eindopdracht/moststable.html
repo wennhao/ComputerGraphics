@@ -10,11 +10,20 @@
           #controls, #controls2 { display: flex; flex-direction: column; margin-left: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 25px; font-weight: bold;  align-items: center;}
           .control-button { margin: 5px; padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif ; font-size: 16px; border-radius: 8px; border: 2px solid ; width: 150px; }
           .control-button:hover { background-color: #D3D3D3; cursor: pointer; }
+          #info { position: absolute; top: 8%; left: 2%; color: black; font-family: Arial, Helvetica, sans-serif; font-size: 22px; }
     </style>
 </head>
 <body>
+    <div id="info">
+        <b>Controls:</b><br>
+        <b>W</b> - Rotate upwards<br>
+        <b>S</b> - Rotate downwards<br>
+        <b>A</b> - Rotate left<br>
+        <b>D</b> - Rotate right<br>
+        <b>R</b> - Toggle standard rotation<br>
+    </div>
     <canvas id="myCanvas" width="640" height="480"></canvas>
-    <div id="title">Planet Creator</div>
+    <div id="title">Create your own planet</div>
     <div id="controls">
         <div>Objects</div>
         <button class="control-button" onclick="changeObject(0)">Cube</button>
@@ -32,6 +41,7 @@
         <button class="control-button" onclick="changeTexture(3)">Uranus</button>
         <button class="control-button" onclick="changeTexture(4)">Mars</button>
     </div>
+
     <script type="text/javascript">
         const ROTATION_SPEED = 0.05; // radians per key press
         const OBJECTS = ["objects/cube.obj", "objects/beveledcube.obj", "objects/cone.obj","objects/icosphere.obj", "objects/sphere.obj", "objects/planet.obj"];
