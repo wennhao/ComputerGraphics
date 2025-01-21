@@ -21,6 +21,11 @@
         <b>A</b> - Rotate left<br>
         <b>D</b> - Rotate right<br>
         <b>R</b> - Toggle standard rotation<br>
+        <b>1</b> - Toggle red color<br>
+        <b>2</b> - Toggle green color<br>
+        <b>3</b> - Toggle blue color<br>
+        <b>4</b> - Reset color<br>
+        <div id="colorDisplay">Color: rgba(1, 1, 1, 1)</div>
     </div>
     <canvas id="myCanvas" width="640" height="480"></canvas>
     <div id="title">Create your own planet</div>
@@ -110,10 +115,16 @@
                         // Get position and normal corresponding to index
                         // Index is 1-based, so subtract 1
                         let vertList = indexList.map((l) => [
+                            // Get the position coordinates from the pos array using the first index
                             pos[l[0] - 1][0], pos[l[0] - 1][1], pos[l[0] - 1][2],  // Position
+
+                            // Get the normal coordinates from the normal array using the third index
                             normal[l[2] - 1][0], normal[l[2] - 1][1], normal[l[2] - 1][2],  // Normal
+
+                            // Get the texture coordinates from the texCoord array using the second index
                             texCoord[l[1] - 1][0], texCoord[l[1] - 1][1]  // Texture coordinates
                         ]);
+                        
                         // Faces may be polygons with more than 3 vertices, so convert to series of triangles
                         // Only works for concave shapes
                         for (let j = 1; j < vertList.length - 1; j++) {
@@ -187,10 +198,9 @@
                 mat4 rotation = rotationYMatrix * rotationXMatrix;
 
                 gl_Position = projection * translation * fixedRotation * rotation * vec4(aPos, 1.0); 
-                
                 normal = mat3(fixedRotation * rotation) * aNormal; // We don't want translation or projection for the normal;
                 fragPos = vec3(translation * fixedRotation * rotation * vec4(aPos, 1.0)); // Position in 3D space before projection
-                texCoord = aTexCoord;
+                texCoord = aTexCoord; // Pass texture coordinates to fragment shader
                 
             }`;
         gl.shaderSource(vs, vsSource);
@@ -213,16 +223,17 @@
 
             out vec4 fragColor;
 
-            uniform sampler2D aTexture;
+            uniform sampler2D aTexture; // Texture sampler
+            uniform vec4 baseColor; // Base color of the object
 
             vec3 lightPos = vec3(1.0f, -2.0f, 10.0f); // Fixed for now
-            vec4 baseColor = vec4(1.0f, 1.0f, 1.0f, 1.0f); // Fixed for now
+           
 
             void main() {
                 vec3 normalizedNormal = normalize(normal);
                 vec3 reverseLightDirection = normalize(lightPos - fragPos);
                 vec3 reflectedDirection = reflect(reverseLightDirection, normalizedNormal);
-                vec3 viewingDirection = normalize(fragPos); // Camera is at origin
+                vec3 viewingDirection = normalize(fragPos); // camera is at origin
 
                 float ambient = 0.2f;
                 float diffuse = 0.5f * max(0.0f, dot(normalizedNormal, reverseLightDirection));
@@ -249,6 +260,13 @@
         gl.deleteShader(vs);
         gl.deleteShader(fs);
         gl.useProgram(program);
+
+        // Get location of texture sampler
+        let baseColor = gl.getUniformLocation(program, "baseColor");
+
+        // Set base color to white
+        let colorValue = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }; //1.0f, 1.0f, 1.0f, 1.0f / base color (white)
+        gl.uniform4f(baseColor, colorValue.r, colorValue.g, colorValue.b, colorValue.a); // Apply base color
 
         // Retrieve 3D object file
         let text;
@@ -322,6 +340,7 @@
         // Enable z-buffer test
         gl.enable(gl.DEPTH_TEST);
 
+        // Create a texture buffer
         var texture = gl.createTexture();
 
         // Bind the texture buffer
@@ -330,7 +349,8 @@
         // Fill the texture buffer with a temporary texture of 1 texel (3 Uints)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3), 0);
 
-        const image = new Image();
+        // Create an image
+        var image = new Image();
         image.src = TEXTURE_NAME;
 
         // Once the image has loaded, use it to fill the texture buffer
@@ -362,6 +382,16 @@
             } else if (key === "r") {
                 standardRotationEnabled = !standardRotationEnabled;
                 console.log("r");
+            } else if (key == "1" || key == "2" || key == "3" || key == "4") {
+                let colorMap = { "1": "r", "2": "g", "3": "b",}; // assign each key to a color
+                if (key == "4") {
+                    colorValue = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }; // reset to white
+                } else {
+                    colorValue[colorMap[key]] = colorValue[colorMap[key]] === 1.0 ? 0.0 : 1.0; // if color is 1.0, set to 0.0, else set to 1.0
+                }
+                gl.uniform4f(baseColor, colorValue.r, colorValue.g, colorValue.b, colorValue.a);
+                document.getElementById("colorDisplay").innerText = `Color: rgba(${colorValue.r}, ${colorValue.g}, ${colorValue.b}, ${colorValue.a})`;
+                console.log(key); //print pressed key
             }
         });
 
