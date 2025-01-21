@@ -7,17 +7,40 @@
           body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #A9A9A9;}
           canvas { border: 5px solid #36454F; }
           #title { position: absolute; top: 8%; color: black; font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif; font-size: 50px; }
+          #controls, #controls2 { display: flex; flex-direction: column; margin-left: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 25px; font-weight: bold;  align-items: center;}
+          .control-button { margin: 5px; padding: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif ; font-size: 16px; border-radius: 8px; border: 2px solid ; width: 150px; }
+          .control-button:hover { background-color: #D3D3D3; cursor: pointer; }
     </style>
 </head>
 <body>
     <canvas id="myCanvas" width="640" height="480"></canvas>
-    <div id="title">Create your own planet</div>
+    <div id="title">Planet Creator</div>
+    <div id="controls">
+        <div>Objects</div>
+        <button class="control-button" onclick="changeObject(0)">Cube</button>
+        <button class="control-button" onclick="changeObject(1)">Beveled Cube</button>
+        <button class="control-button" onclick="changeObject(2)">Cone</button>
+        <button class="control-button" onclick="changeObject(3)">Icosphere</button>
+        <button class="control-button" onclick="changeObject(4)">Sphere</button>
+        <button class="control-button" onclick="changeObject(5)">Planet</button>
+    </div>
+    <div id="controls2">
+        <div>Textures</div>
+        <button class="control-button" onclick="changeTexture(0)">Earth</button>
+        <button class="control-button" onclick="changeTexture(1)">Venus</button>
+        <button class="control-button" onclick="changeTexture(2)">Neptune</button>
+        <button class="control-button" onclick="changeTexture(3)">Uranus</button>
+        <button class="control-button" onclick="changeTexture(4)">Mars</button>
+    </div>
     <script type="text/javascript">
         const ROTATION_SPEED = 0.05; // radians per key press
-        const OBJECTS = ["objects/cone.obj", "objects/cube.obj", "objects/beveledcube.obj","objects/icosphere.obj", "objects/sphere.obj", "objects/planet.obj"];
-        const FILE_NAME = OBJECTS[5];
-        const TEXTURES = ["textures/earth.png", "textures/venus.png", "textures/neptune.png", "textures/uranus.png"];
-        const TEXTURE_NAME = TEXTURES[3];
+        const OBJECTS = ["objects/cube.obj", "objects/beveledcube.obj", "objects/cone.obj","objects/icosphere.obj", "objects/sphere.obj", "objects/planet.obj"];
+        const TEXTURES = ["textures/earth.png", "textures/venus.png", "textures/neptune.png", "textures/uranus.png", "textures/mars.png"];
+        
+        var objectIndex = 0; //default
+        var textureIndex = 0; //default
+        var FILE_NAME = OBJECTS[objectIndex];
+        var TEXTURE_NAME = TEXTURES[textureIndex];
 
         let rotationX = 0;
         let rotationY = 0;
@@ -105,7 +128,7 @@
             gl.uniform1f(rotationYLocation, rotationY);
 
             // Tell opengl to draw the vertices in the arrayBuffer as a series of triangles
-            gl.drawArrays(gl.TRIANGLES, 0, data.length / 8);
+            gl.drawArrays(gl.TRIANGLES, 0, data.length / 6);
         }
 
         function draw() {
@@ -331,6 +354,51 @@
                 console.log("r");
             }
         });
+
+        function changeObject(index) {
+            FILE_NAME = OBJECTS[index];
+            console.log("Changed object to: " + FILE_NAME);
+
+            // Retrieve 3D object file
+            const req = new XMLHttpRequest();
+            req.onload = function() {
+                text = this.responseText;
+            };
+            req.open("GET", FILE_NAME, false); // false means synchronous request (wait for completion)
+            req.send();
+            // Convert object file to vertex data
+            data = parseOBJ(text);
+
+            // Convert to correct type
+            vertices = new Float32Array(data);
+
+            // Update the buffer data with the new vertices
+            gl.bindBuffer(gl.ARRAY_BUFFER, arrayBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        }
+
+        function changeTexture(index) {
+            TEXTURE_NAME = TEXTURES[index];
+            console.log("Changed texture to: " + TEXTURE_NAME);
+
+            // Bind the texture buffer
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            // Fill the texture buffer with a temporary texture of 1 texel (3 Uints)
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3), 0);
+
+            const image = new Image();
+            image.src = TEXTURE_NAME;
+
+            // Once the image has loaded, use it to fill the texture buffer
+            image.addEventListener("load", function() {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            });
+
+            // Specify how the texture should be scaled
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
     </script>
 </body>
 </html>
