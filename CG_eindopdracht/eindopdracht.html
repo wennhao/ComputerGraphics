@@ -40,20 +40,24 @@
     </div>
     <div id="controls2">
         <div>Textures</div>
-        <button class="control-button" onclick="changeTexture(0)">Earth</button>
-        <button class="control-button" onclick="changeTexture(1)">Venus</button>
-        <button class="control-button" onclick="changeTexture(2)">Neptune</button>
-        <button class="control-button" onclick="changeTexture(3)">Uranus</button>
+        <button class="control-button" onclick="changeTexture(0)">Sun</button>
+        <button class="control-button" onclick="changeTexture(1)">Mercury</button>
+        <button class="control-button" onclick="changeTexture(2)">Venus</button>
+        <button class="control-button" onclick="changeTexture(3)">Earth</button>
         <button class="control-button" onclick="changeTexture(4)">Mars</button>
+        <button class="control-button" onclick="changeTexture(5)">Jupiter</button>
+        <button class="control-button" onclick="changeTexture(6)">Saturn</button>
+        <button class="control-button" onclick="changeTexture(7)">Uranus</button>
+        <button class="control-button" onclick="changeTexture(8)">Neptune</button>
     </div>
 
     <script type="text/javascript">
         const ROTATION_SPEED = 0.05; // radians per key press
         const OBJECTS = ["objects/cube.obj", "objects/beveledcube.obj", "objects/cone.obj","objects/icosphere.obj", "objects/sphere.obj", "objects/planet.obj"];
-        const TEXTURES = ["textures/earth.png", "textures/venus.png", "textures/neptune.png", "textures/uranus.png", "textures/mars.png"];
+        const TEXTURES = ["textures/sun.png","textures/mercury.png", "textures/venus.png", "textures/earth.png", "textures/mars.png", "textures/jupiter.png", "textures/saturn.png", "textures/uranus.png", "textures/neptune.png", ];
         
         var objectIndex = 0; //default
-        var textureIndex = 0; //default
+        var textureIndex = 3; //default which is the earth texture
         var FILE_NAME = OBJECTS[objectIndex];
         var TEXTURE_NAME = TEXTURES[textureIndex];
 
@@ -390,36 +394,39 @@
                     colorValue[colorMap[key]] = colorValue[colorMap[key]] === 1.0 ? 0.0 : 1.0; // if color is 1.0, set to 0.0, else set to 1.0
                 }
                 gl.uniform4f(baseColor, colorValue.r, colorValue.g, colorValue.b, colorValue.a);
-                document.getElementById("colorDisplay").innerText = `Color: rgba(${colorValue.r}, ${colorValue.g}, ${colorValue.b}, ${colorValue.a})`;
+                document.getElementById("colorDisplay").innerText = `Color: rgba(${colorValue.r}, ${colorValue.g}, ${colorValue.b}, ${colorValue.a})`; // update color display
                 console.log(key); //print pressed key
             }
         });
 
         function changeObject(index) {
-            FILE_NAME = OBJECTS[index];
-            console.log("Changed object to: " + FILE_NAME);
+            FILE_NAME = OBJECTS[index]; // Change the object file
+            console.log("Changed object to: " + FILE_NAME); // Log the change
 
             // Retrieve 3D object file
+            let text;
             const req = new XMLHttpRequest();
-            req.onload = function() {
-                text = this.responseText;
-            };
+            req.onload = function() {text = this.responseText};
             req.open("GET", FILE_NAME, false); // false means synchronous request (wait for completion)
             req.send();
+
             // Convert object file to vertex data
             data = parseOBJ(text);
 
             // Convert to correct type
             vertices = new Float32Array(data);
 
-            // Update the buffer data with the new vertices
+            // Clear the buffer data
             gl.bindBuffer(gl.ARRAY_BUFFER, arrayBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, null, gl.STATIC_DRAW);
+
+            // Update the buffer data with the new vertices
             gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
         }
 
         function changeTexture(index) {
-            TEXTURE_NAME = TEXTURES[index];
-            console.log("Changed texture to: " + TEXTURE_NAME);
+            TEXTURE_NAME = TEXTURES[index]; // Change the texture file
+            console.log("Changed texture to: " + TEXTURE_NAME); // Log the change
 
             // Bind the texture buffer
             gl.bindTexture(gl.TEXTURE_2D, texture);
